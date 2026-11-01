@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     # Apps do projeto
     "accounts",
     "members",
+    "billing",
 ]
 
 MIDDLEWARE = [
@@ -122,3 +123,11 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# --- PIX ---
+# "fake" simula o banco (desenvolvimento e testes); "bb" entra quando houver credenciais
+PIX_PROVIDER = env("PIX_PROVIDER", default="fake")
+# Segredo que o banco envia no webhook de confirmação de pagamento
+PIX_WEBHOOK_SECRET = env("PIX_WEBHOOK_SECRET", default="")
+# Liga a opção Pix Automático no app quando o BB confirmar o acesso
+PIX_AUTOMATIC_ENABLED = env.bool("PIX_AUTOMATIC_ENABLED", default=False)

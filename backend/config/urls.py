@@ -7,6 +7,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("accounts.urls")),
     path("api/", include("members.urls")),
+    path("api/", include("billing.urls")),
 ]
 
 # A documentação da API só fica exposta em desenvolvimento
