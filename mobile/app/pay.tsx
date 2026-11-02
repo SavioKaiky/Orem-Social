@@ -1,18 +1,34 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
+import { ErrorBoundaryProps, Redirect, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { Banner, Body, Button, Card, Screen, Title } from '../../src/components/ui';
-import { api, messageOf } from '../../src/lib/api';
-import { formatMoney } from '../../src/lib/format';
-import { BillingSummary, Payment, PaymentMethodInfo } from '../../src/lib/types';
-import { colors, radius, spacing } from '../../src/theme';
+import { Banner, Body, Button, Card, Screen, Title } from '../src/components/ui';
+import { api, messageOf } from '../src/lib/api';
+import { useAuth } from '../src/lib/auth';
+import { formatMoney } from '../src/lib/format';
+import { BillingSummary, Payment, PaymentMethodInfo } from '../src/lib/types';
+import { colors, radius, spacing } from '../src/theme';
+
+// TEMPORÁRIO (diagnóstico): se a tela quebrar ao renderizar, o erro aparece aqui no celular
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <Screen>
+      <Title>Erro na tela de pagamento</Title>
+      <Banner kind="error">{String(error?.message ?? error)}</Banner>
+      <Body muted>{String(error?.stack ?? '').slice(0, 900)}</Body>
+      <View style={{ height: spacing.md }} />
+      <Button title="Tentar de novo" onPress={() => retry()} />
+    </Screen>
+  );
+}
 
 export default function PayScreen() {
+  console.log('PAY: tela renderizou');
   const router = useRouter();
+  const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const [method, setMethod] = useState<PaymentMethodInfo['code']>('pix_manual');
   const [payment, setPayment] = useState<Payment | null>(null);
@@ -35,12 +51,13 @@ export default function PayScreen() {
   // Enquanto o PIX não for confirmado, consulta o servidor a cada 5 segundos
   const status = useQuery({
     queryKey: ['payment', payment?.id],
-    queryFn: () => api<Payment>(`/billing/payments/${payment!.id}/`),
+    queryFn: () => api<Payment>(`/billing/payments/${payment?.id}/`),
     enabled: !!payment && payment.status === 'pending',
     refetchInterval: (query) => (query.state.data?.status === 'paid' ? false : 5000),
   });
 
-  const current = status.data ?? payment;
+  // Se qualquer fonte já disser "pago", vale essa; senão usa a resposta mais recente
+  const current = [status.data, payment].find((item) => item?.status === 'paid') ?? status.data ?? payment;
   const paid = current?.status === 'paid';
 
   React.useEffect(() => {
@@ -48,15 +65,24 @@ export default function PayScreen() {
   }, [paid, queryClient]);
 
   const simulate = useMutation({
-    mutationFn: () => api<Payment>('/billing/dev/simulate-payment/', { method: 'POST', body: { txid: current!.txid } }),
-    onSuccess: (data) => setPayment(data),
+    // O txid entra como argumento (e não lido de `current` aqui dentro): o React Compiler
+    // lê esses valores antecipadamente e quebrava com `current` ainda nulo
+    mutationFn: (txid: string) =>
+      api<Payment>('/billing/dev/simulate-payment/', { method: 'POST', body: { txid } }),
+    onSuccess: (data) => {
+      setPayment(data);
+      queryClient.setQueryData(['payment', data.id], data);
+    },
   });
 
-  async function copyCode() {
-    await Clipboard.setStringAsync(current!.pix_copy_paste);
+  async function copyCode(code: string) {
+    await Clipboard.setStringAsync(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   }
+
+  // Esta tela está fora das abas, então ela mesma confere se há sessão
+  if (!loading && !user) return <Redirect href="/login" />;
 
   if (paid) {
     return (
@@ -73,15 +99,35 @@ export default function PayScreen() {
       <Screen>
         <Title>Pague com PIX</Title>
         <Body muted>Valor: {formatMoney(current.amount)}</Body>
-        <View style={{ alignItems: 'center', marginVertical: spacing.lg, padding: spacing.md, backgroundColor: '#fff', borderRadius: radius.md }}>
+        <View
+          style={{
+            alignItems: 'center',
+            marginVertical: spacing.lg,
+            padding: spacing.md,
+            backgroundColor: '#fff',
+            borderRadius: radius.md,
+          }}>
           <QRCode value={current.pix_copy_paste} size={220} />
         </View>
-        <Body>1. Abra o aplicativo do seu banco.{'\n'}2. Escolha pagar com PIX e leia o QR Code, ou use o código copia e cola.{'\n'}3. Volte aqui: a confirmação aparece sozinha.</Body>
+        <Body>
+          1. Abra o aplicativo do seu banco.{'\n'}2. Escolha pagar com PIX e leia o QR Code, ou use o código copia e
+          cola.{'\n'}3. Volte aqui: a confirmação aparece sozinha.
+        </Body>
         <View style={{ height: spacing.md }} />
-        <Button title={copied ? 'Código copiado!' : 'Copiar código PIX'} onPress={copyCode} />
+        <Button title={copied ? 'Código copiado!' : 'Copiar código PIX'} onPress={() => copyCode(current.pix_copy_paste)} />
         <Banner kind="info">Aguardando o pagamento... Esta cobrança vale por 24 horas.</Banner>
+        {simulate.isError ? (
+          <Banner kind="error">
+            A simulação falhou: {messageOf(simulate.error)} Confira se o backend está com DJANGO_DEBUG=True.
+          </Banner>
+        ) : null}
         {__DEV__ ? (
-          <Button title="Simular pagamento (só em desenvolvimento)" variant="outline" onPress={() => simulate.mutate()} loading={simulate.isPending} />
+          <Button
+            title="Simular pagamento (só em desenvolvimento)"
+            variant="outline"
+            onPress={() => simulate.mutate(current.txid)}
+            loading={simulate.isPending}
+          />
         ) : null}
         <Button title="Voltar" variant="ghost" onPress={() => router.back()} />
       </Screen>
@@ -97,7 +143,7 @@ export default function PayScreen() {
       {methods.isLoading ? <Body muted>Carregando...</Body> : null}
       {methods.isError ? <Banner kind="error">{messageOf(methods.error)}</Banner> : null}
 
-      {methods.data?.map((item) => {
+      {Array.isArray(methods.data) ? methods.data.map((item) => {
         const selected = method === item.code && item.available;
         return (
           <Pressable
@@ -108,10 +154,20 @@ export default function PayScreen() {
             <Card>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 18, fontWeight: '700', color: selected ? colors.primary : colors.text }}>
-                  {selected ? '● ' : '○ '}{item.title}
+                  {selected ? '● ' : '○ '}
+                  {item.title}
                 </Text>
                 {item.recommended ? (
-                  <Text style={{ backgroundColor: colors.accent, color: '#fff', fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' }}>
+                  <Text
+                    style={{
+                      backgroundColor: colors.accent,
+                      color: '#fff',
+                      fontWeight: '700',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 999,
+                      overflow: 'hidden',
+                    }}>
                     Recomendado
                   </Text>
                 ) : null}
@@ -121,10 +177,19 @@ export default function PayScreen() {
             </Card>
           </Pressable>
         );
-      })}
+      }) : null}
+
+      {methods.data && !Array.isArray(methods.data) ? (
+        <Banner kind="error">Resposta inesperada do servidor em payment-methods.</Banner>
+      ) : null}
 
       {createCharge.isError ? <Banner kind="error">{messageOf(createCharge.error)}</Banner> : null}
-      <Button title="Gerar PIX" onPress={() => createCharge.mutate()} loading={createCharge.isPending} disabled={method !== 'pix_manual'} />
+      <Button
+        title="Gerar PIX"
+        onPress={() => createCharge.mutate()}
+        loading={createCharge.isPending}
+        disabled={method !== 'pix_manual'}
+      />
       <Button title="Voltar" variant="ghost" onPress={() => router.back()} />
     </Screen>
   );

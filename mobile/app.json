@@ -39,7 +39,18 @@
     ],
     "experiments": {
       "typedRoutes": false,
-      "reactCompiler": true
-    }
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "c84c7d9f-5a9a-4e25-a958-d53c54d900c2"
+      }
+    },
+    "owner": "kaikylopess-team"
   }
 }

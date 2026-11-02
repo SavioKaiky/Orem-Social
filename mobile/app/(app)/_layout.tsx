@@ -33,8 +33,6 @@ export default function AppLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color as string} />,
         }}
       />
-      {/* A tela de pagamento abre pelo botão do início, sem ter aba própria */}
-      <Tabs.Screen name="pay" options={{ href: null }} />
     </Tabs>
   );
 }
