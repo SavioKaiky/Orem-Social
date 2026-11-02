@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
-import { ErrorBoundaryProps, Redirect, useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -12,21 +12,7 @@ import { formatMoney } from '../src/lib/format';
 import { BillingSummary, Payment, PaymentMethodInfo } from '../src/lib/types';
 import { colors, radius, spacing } from '../src/theme';
 
-// TEMPORÁRIO (diagnóstico): se a tela quebrar ao renderizar, o erro aparece aqui no celular
-export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  return (
-    <Screen>
-      <Title>Erro na tela de pagamento</Title>
-      <Banner kind="error">{String(error?.message ?? error)}</Banner>
-      <Body muted>{String(error?.stack ?? '').slice(0, 900)}</Body>
-      <View style={{ height: spacing.md }} />
-      <Button title="Tentar de novo" onPress={() => retry()} />
-    </Screen>
-  );
-}
-
 export default function PayScreen() {
-  console.log('PAY: tela renderizou');
   const router = useRouter();
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
