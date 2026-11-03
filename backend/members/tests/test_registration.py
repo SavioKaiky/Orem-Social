@@ -58,6 +58,28 @@ def test_register_creates_everything(api_client, current_terms, payload):
     assert acceptance.terms.version == "teste-1.0"
 
 
+def test_terms_acceptance_records_real_client_ip(api_client, current_terms, payload):
+    """Atrás do túnel da Cloudflare, o IP do cliente vem em CF-Connecting-IP."""
+    response = api_client.post(URL, payload, format="json", HTTP_CF_CONNECTING_IP="203.0.113.7")
+    assert response.status_code == 201
+    acceptance = TermsAcceptance.objects.get(user__cpf=payload["cpf"])
+    assert acceptance.ip_address == "203.0.113.7"
+
+
+def test_terms_acceptance_falls_back_to_remote_addr(api_client, current_terms, payload):
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 201
+    acceptance = TermsAcceptance.objects.get(user__cpf=payload["cpf"])
+    assert acceptance.ip_address == "127.0.0.1"
+
+
+def test_invalid_client_ip_header_does_not_break_registration(api_client, current_terms, payload):
+    response = api_client.post(URL, payload, format="json", HTTP_CF_CONNECTING_IP="isso-nao-e-ip")
+    assert response.status_code == 201
+    acceptance = TermsAcceptance.objects.get(user__cpf=payload["cpf"])
+    assert acceptance.ip_address == "127.0.0.1"
+
+
 def test_registered_user_can_login(api_client, current_terms, payload):
     api_client.post(URL, payload, format="json")
     response = api_client.post(

@@ -1,3 +1,5 @@
+import ipaddress
+
 from django.contrib.auth.password_validation import validate_password as run_password_validators
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -16,6 +18,23 @@ from .models import (
 )
 from .validators import validate_not_future
 
+
+def _client_ip(request):
+    """IP real do cliente, para registrar no aceite dos termos.
+
+    Atrás do túnel da Cloudflare o REMOTE_ADDR é o do próprio túnel; o IP de quem fez a
+    requisição vem no cabeçalho CF-Connecting-IP. Só aceitamos valores que sejam um IP válido,
+    para um cabeçalho malformado nunca quebrar o cadastro (o campo do banco só guarda IPs).
+    """
+    candidates = (request.META.get("HTTP_CF_CONNECTING_IP"), request.META.get("REMOTE_ADDR"))
+    for raw in candidates:
+        if not raw:
+            continue
+        try:
+            return str(ipaddress.ip_address(raw.strip()))
+        except ValueError:
+            continue
+    return None
 
 class TermsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -172,7 +191,7 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
             state=validated_data["state"],
         )
         TermsAcceptance.objects.create(
-            user=user, terms=validated_data["terms"], ip_address=request.META.get("REMOTE_ADDR")
+            user=user, terms=validated_data["terms"], ip_address=_client_ip(request)
         )
         Dependent.objects.bulk_create(
             [Dependent(beneficiary=profile, **data) for data in validated_data.get("dependents", [])]
