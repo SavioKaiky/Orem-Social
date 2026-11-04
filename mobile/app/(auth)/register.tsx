@@ -84,6 +84,8 @@ export default function RegisterScreen() {
     if (digits(form.cpf).length !== 11) return 'Informe um CPF com 11 números.';
     if (!dateBrToIso(form.birth_date)) return 'Informe uma data de nascimento válida (dia/mês/ano).';
     if (digits(form.phone).length < 10) return 'Informe um telefone com DDD.';
+    if (!form.email.trim()) return 'Informe seu e-mail.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return 'Informe um e-mail válido.';
     if (form.password.length < 8) return 'A senha precisa ter pelo menos 8 caracteres.';
     if (form.password !== form.confirm) return 'As senhas não são iguais.';
     return null;
@@ -165,7 +167,7 @@ export default function RegisterScreen() {
           <Field label="CPF" value={form.cpf} onChangeText={(t) => set('cpf')(maskCpf(t))} keyboardType="number-pad" placeholder="000.000.000-00" />
           <Field label="Data de nascimento" value={form.birth_date} onChangeText={(t) => set('birth_date')(maskDate(t))} keyboardType="number-pad" placeholder="DD/MM/AAAA" />
           <Field label="Telefone (com DDD)" value={form.phone} onChangeText={(t) => set('phone')(maskPhone(t))} keyboardType="number-pad" placeholder="(62) 99999-0000" />
-          <Field label="E-mail (opcional)" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" />
+          <Field label="E-mail" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" />
           <Field label="Crie uma senha" value={form.password} onChangeText={set('password')} secureTextEntry hint="Mínimo de 8 caracteres." />
           <Field label="Repita a senha" value={form.confirm} onChangeText={set('confirm')} secureTextEntry />
           <Button title="Continuar" onPress={next} />

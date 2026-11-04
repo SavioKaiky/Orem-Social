@@ -128,7 +128,7 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
 
     cpf = serializers.CharField(validators=[check_cpf])
     full_name = serializers.CharField(max_length=150)
-    email = serializers.EmailField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=True, allow_blank=False)
     phone = serializers.CharField(max_length=20)
     password = serializers.CharField(write_only=True, min_length=8)
     birth_date = serializers.DateField(validators=[validate_not_future])
@@ -179,7 +179,7 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
             cpf=validated_data["cpf"],
             password=validated_data["password"],
             full_name=validated_data["full_name"],
-            email=validated_data.get("email", ""),
+            email=validated_data["email"],
             phone=validated_data["phone"],
             role=Role.BENEFICIARY,
         )
