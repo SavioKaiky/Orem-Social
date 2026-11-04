@@ -132,3 +132,27 @@ def test_repeated_dependent_cpf_is_rejected(api_client, current_terms, payload):
 def test_register_fails_without_current_terms(api_client, payload):
     TermsVersion.objects.update(is_current=False)
     assert api_client.post(URL, payload, format="json").status_code == 400
+
+@pytest.mark.parametrize("email", ["", "   ", None, "sem-arroba", "maria@", "maria@example.com outra@example.com"])
+def test_registration_rejects_invalid_email(api_client, current_terms, payload, email):
+    """E-mail vazio, nulo ou inválido não pode criar o cadastro."""
+    payload["email"] = email
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "email" in response.data
+    assert not User.objects.filter(cpf=payload["cpf"]).exists()
+
+
+def test_registration_requires_email(api_client, current_terms, payload):
+    del payload["email"]
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "email" in response.data
+    assert not User.objects.filter(cpf=payload["cpf"]).exists()
+
+
+def test_registration_trims_and_saves_email(api_client, current_terms, payload):
+    payload["email"] = "  maria@example.com  "
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 201
+    assert User.objects.get(cpf=payload["cpf"]).email == "maria@example.com"
