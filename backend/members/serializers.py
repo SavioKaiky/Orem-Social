@@ -6,8 +6,9 @@ from django.db import transaction
 from rest_framework import serializers
 
 from accounts.models import Role, User, WorkerProfile
-from accounts.validators import only_digits
+from accounts.validators import normalize_phone, only_digits
 from accounts.validators import validate_cpf as check_cpf
+from accounts.validators import validate_phone
 
 from .models import (
     BeneficiaryProfile,
@@ -104,6 +105,14 @@ class BeneficiarySerializer(serializers.ModelSerializer):
         # O titular só altera contato, cidade e estado; status vem do pagamento
         read_only_fields = ["id", "birth_date", "status", "created_at"]
 
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        validate_phone(phone)
+        queryset = User.objects.filter(phone=phone).exclude(pk=self.instance.user_id)
+        if queryset.exists():
+            raise serializers.ValidationError("Já existe um usuário com este telefone.")
+        return phone
+
     def get_dependents(self, obj):
         items = getattr(obj, "active_dependents", None)
         if items is None:
@@ -137,6 +146,13 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
     worker_code = serializers.CharField(max_length=20)
     accept_terms = serializers.BooleanField()
     dependents = DependentInputSerializer(many=True, required=False)
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        validate_phone(phone)
+        if User.objects.filter(phone=phone).exists():
+            raise serializers.ValidationError("Já existe um usuário com este telefone.")
+        return phone
 
     def validate_cpf(self, value):
         cpf = only_digits(value)

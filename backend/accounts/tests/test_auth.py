@@ -32,6 +32,16 @@ def test_login_with_masked_cpf(api_client, make_user):
     assert response.data["user"]["worker_code"].startswith("OBR-")
 
 
+def test_login_by_phone(api_client, make_user):
+    user = make_user(phone="(62) 99999-0000")
+    response = api_client.post(
+        "/api/auth/login/", {"identifier": "+55 (62) 99999-0000", "password": "Senha@12345"}, format="json"
+    )
+    assert response.status_code == 200
+    assert response.data["user"]["id"] == user.id
+    assert user.phone == "62999990000"
+
+
 def test_login_wrong_password(api_client, make_user):
     user = make_user()
     response = api_client.post("/api/auth/login/", {"cpf": user.cpf, "password": "errada"}, format="json")

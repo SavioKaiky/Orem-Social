@@ -122,6 +122,14 @@ def test_duplicate_cpf_is_rejected(api_client, current_terms, payload):
     assert api_client.post(URL, payload, format="json").status_code == 400
 
 
+def test_duplicate_phone_is_rejected_after_normalization(api_client, current_terms, payload, make_user):
+    make_user(phone="(62) 99999-0000")
+    payload["phone"] = "+55 (62) 99999-0000"
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "phone" in response.data
+
+
 def test_repeated_dependent_cpf_is_rejected(api_client, current_terms, payload):
     repeated = generate_cpf("444555666")
     for dependent in payload["dependents"]:

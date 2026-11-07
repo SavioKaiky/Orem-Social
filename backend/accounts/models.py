@@ -2,9 +2,10 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
-from .validators import only_digits, validate_cpf
+from .validators import normalize_phone, only_digits, validate_cpf
 
 
 class Role(models.TextChoices):
@@ -77,6 +78,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = "usuário"
         verbose_name_plural = "usuários"
         ordering = ["full_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["phone"], condition=~Q(phone=""), name="unique_user_phone_when_set"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.phone = normalize_phone(self.phone)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.full_name} ({self.get_role_display()})"

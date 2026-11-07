@@ -1,9 +1,11 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import Role, User, WorkerProfile
-from .validators import only_digits, validate_cpf
+from .validators import normalize_phone, only_digits, validate_cpf, validate_phone
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -19,7 +21,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(TokenObtainPairSerializer):
-    """Login com CPF (com ou sem máscara) e senha."""
+    """Login com CPF ou telefone no mesmo campo e senha."""
+
+    cpf = serializers.CharField(required=False, write_only=True)
+    identifier = serializers.CharField(required=False, write_only=True)
 
     @classmethod
     def get_token(cls, user):
@@ -28,7 +33,19 @@ class LoginSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        attrs[self.username_field] = only_digits(attrs[self.username_field])
+        identifier = attrs.pop("identifier", None) or attrs.get("cpf", "")
+        digits = only_digits(identifier)
+        if not digits:
+            raise serializers.ValidationError({"identifier": "Informe seu CPF ou telefone."})
+
+        phone = normalize_phone(identifier)
+        candidates = User.objects.filter(Q(cpf=digits) | Q(phone=phone)).distinct()
+        if candidates.count() > 1:
+            raise AuthenticationFailed("CPF ou telefone e senha incorretos.")
+
+        user = candidates.first()
+        attrs[self.username_field] = user.cpf if user else digits
+        attrs.pop("identifier", None)
         data = super().validate(attrs)
         data["user"] = UserSerializer(self.user).data
         return data
@@ -48,6 +65,17 @@ class WorkerSerializer(serializers.ModelSerializer):
         model = WorkerProfile
         fields = ["id", "code", "cpf", "full_name", "email", "phone", "is_active", "password", "created_at"]
         read_only_fields = ["id", "code", "created_at"]
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        if phone:
+            validate_phone(phone)
+            queryset = User.objects.filter(phone=phone)
+            if self.instance is not None:
+                queryset = queryset.exclude(pk=self.instance.user_id)
+            if queryset.exists():
+                raise serializers.ValidationError("Já existe um usuário com este telefone.")
+        return phone
 
     def validate_cpf(self, value):
         cpf = only_digits(value)
