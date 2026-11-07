@@ -183,3 +183,24 @@ def test_notifications_are_private(api_client, make_user):
     assert api_client.get("/api/billing/notifications/").data["count"] == 1
     api_client.force_authenticate(other)
     assert api_client.get("/api/billing/notifications/").data["count"] == 0
+
+
+def test_mark_all_notifications_read_only_updates_current_user(api_client, make_user):
+    owner = make_user()
+    other = make_user()
+    owned = Notification.objects.create(
+        user=owner, kind=NotificationKind.DUE_SOON, title="t", body="b", dedupe_key="x-owner"
+    )
+    other_notification = Notification.objects.create(
+        user=other, kind=NotificationKind.DUE_SOON, title="t", body="b", dedupe_key="x-other"
+    )
+
+    api_client.force_authenticate(owner)
+    response = api_client.post("/api/billing/notifications/mark-all-read/")
+
+    assert response.status_code == 200
+    assert response.data["updated"] == 1
+    owned.refresh_from_db()
+    other_notification.refresh_from_db()
+    assert owned.read_at is not None
+    assert other_notification.read_at is None

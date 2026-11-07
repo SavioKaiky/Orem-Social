@@ -5,6 +5,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -118,6 +119,11 @@ class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         if getattr(self, "swagger_fake_view", False):
             return Notification.objects.none()
         return Notification.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="mark-all-read")
+    def mark_all_read(self, request):
+        updated = self.get_queryset().filter(read_at__isnull=True).update(read_at=timezone.now())
+        return Response({"updated": updated})
 
 
 class PixWebhookView(APIView):
