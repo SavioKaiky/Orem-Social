@@ -26,6 +26,12 @@ class LoginSerializer(TokenObtainPairSerializer):
     cpf = serializers.CharField(required=False, write_only=True)
     identifier = serializers.CharField(required=False, write_only=True)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TokenObtainSerializer recria o campo definido por USERNAME_FIELD
+        # como obrigatório durante a inicialização.
+        self.fields[self.username_field].required = False
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)

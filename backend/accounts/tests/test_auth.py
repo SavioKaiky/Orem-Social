@@ -37,7 +37,7 @@ def test_login_by_phone(api_client, make_user):
     response = api_client.post(
         "/api/auth/login/", {"identifier": "+55 (62) 99999-0000", "password": "Senha@12345"}, format="json"
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, response.data
     assert response.data["user"]["id"] == user.id
     assert user.phone == "62999990000"
 
