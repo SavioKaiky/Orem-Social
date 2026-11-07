@@ -123,6 +123,25 @@ def test_webhook_unknown_txid_is_queued_for_admin(api_client, db, settings):
     response = api_client.post(f"{WEBHOOK}?hmac=segredo", body, format="json")
     assert response.status_code == 200
     assert UnidentifiedPayment.objects.count() == 1
+    assert not Notification.objects.filter(kind=NotificationKind.UNIDENTIFIED_PAYMENT).exists()
+
+
+def test_webhook_wrong_amount_notifies_beneficiary_once(api_client, make_beneficiary, settings):
+    settings.PIX_WEBHOOK_SECRET = "segredo"
+    beneficiary = make_beneficiary()
+    payment = create_contribution_charge(beneficiary)
+    body = _webhook_body(payment, amount=Decimal("10.00"), e2e="E1")
+
+    for _ in range(2):
+        response = api_client.post(f"{WEBHOOK}?hmac=segredo", body, format="json")
+        assert response.status_code == 200
+
+    notification = Notification.objects.get(kind=NotificationKind.UNIDENTIFIED_PAYMENT)
+    assert notification.user == beneficiary.user
+    assert notification.title == "Não identificamos seu pagamento"
+    assert Notification.objects.filter(kind=NotificationKind.UNIDENTIFIED_PAYMENT).count() == 1
+    payment.refresh_from_db()
+    assert payment.status == PaymentStatus.PENDING
 
 
 def test_payments_list_is_scoped(api_client, make_user, make_beneficiary):

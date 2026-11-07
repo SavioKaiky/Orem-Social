@@ -7,7 +7,7 @@ import { Banner, Body, Button, Card, Loading, Screen, Title } from '../../src/co
 import { api, messageOf } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
 import { firstName, formatDate, formatMoney } from '../../src/lib/format';
-import { BillingSummary } from '../../src/lib/types';
+import { BillingSummary, Notification, Paginated } from '../../src/lib/types';
 import { colors, font } from '../../src/theme';
 
 export default function HomeScreen() {
@@ -18,6 +18,12 @@ export default function HomeScreen() {
   const billing = useQuery({
     queryKey: ['billing-me'],
     queryFn: () => api<BillingSummary>('/billing/me/'),
+    enabled: isBeneficiary,
+  });
+
+  const notifications = useQuery({
+    queryKey: ['billing-notifications'],
+    queryFn: () => api<Paginated<Notification>>('/billing/notifications/'),
     enabled: isBeneficiary,
   });
 
@@ -37,6 +43,15 @@ export default function HomeScreen() {
         <Banner kind="error">{messageOf(billing.error)}</Banner>
       ) : billing.data ? (
         <>
+          {notifications.data?.results.map((notification) => (
+            <Card key={notification.id}>
+              <Text style={{ fontSize: font.small, fontWeight: '700', color: colors.accent }}>
+                {notification.title}
+              </Text>
+              <Body>{notification.body}</Body>
+            </Card>
+          ))}
+
           <Card>
             <Text style={{ fontSize: font.small, color: colors.muted }}>Situação da contribuição</Text>
             {billing.data.is_current ? (
