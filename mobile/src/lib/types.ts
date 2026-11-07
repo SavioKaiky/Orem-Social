@@ -48,4 +48,20 @@ export type Pricing = {
   dependent_amount: string;
 };
 
+export type Notification = {
+  id: number;
+  kind: 'due_soon' | 'overdue' | 'unidentified_payment';
+  title: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type Paginated<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
 export type Terms = { version: string; content: string };
