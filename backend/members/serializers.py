@@ -46,16 +46,15 @@ class TermsSerializer(serializers.ModelSerializer):
 class DependentInputSerializer(serializers.ModelSerializer):
     """Dados do dependente. Usado no cadastro do titular e como base da API de dependentes."""
 
-    cpf = serializers.CharField(required=False, allow_blank=True, validators=[check_cpf])
+    cpf = serializers.CharField(validators=[check_cpf])
+    email = serializers.EmailField(max_length=254)
 
     class Meta:
         model = Dependent
-        fields = ["full_name", "birth_date", "cpf", "relationship"]
+        fields = ["full_name", "birth_date", "cpf", "email", "relationship"]
 
     def validate_cpf(self, value):
         cpf = only_digits(value)
-        if not cpf:
-            return ""
         queryset = Dependent.objects.filter(cpf=cpf)
         if self.instance is not None:
             queryset = queryset.exclude(pk=self.instance.pk)
@@ -70,7 +69,7 @@ class DependentSerializer(DependentInputSerializer):
     )
 
     class Meta(DependentInputSerializer.Meta):
-        fields = ["id", "beneficiary", "full_name", "birth_date", "cpf", "relationship", "created_at"]
+        fields = ["id", "beneficiary", "full_name", "birth_date", "cpf", "email", "relationship", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate(self, attrs):

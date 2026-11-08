@@ -22,11 +22,18 @@ def payload(make_user):
         "worker_code": worker.code,
         "accept_terms": True,
         "dependents": [
-            {"full_name": "João Silva", "birth_date": "2010-06-01", "relationship": "child"},
+            {
+                "full_name": "João Silva",
+                "birth_date": "2010-06-01",
+                "cpf": generate_cpf("222333444"),
+                "email": "joao@example.com",
+                "relationship": "child",
+            },
             {
                 "full_name": "Ana Silva",
                 "birth_date": "1960-02-10",
                 "cpf": generate_cpf("444555666"),
+                "email": "ana@example.com",
                 "relationship": "parent",
             },
         ],
@@ -46,6 +53,7 @@ def test_register_creates_everything(api_client, current_terms, payload):
     assert response.data["group"] == "OREM/GO"
     assert response.data["worker_code"] == payload["worker_code"]
     assert len(response.data["dependents"]) == 2
+    assert {d["email"] for d in response.data["dependents"]} == {"joao@example.com", "ana@example.com"}
 
     user = User.objects.get(cpf=payload["cpf"])
     assert user.role == Role.BENEFICIARY

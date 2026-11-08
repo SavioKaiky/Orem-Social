@@ -133,6 +133,7 @@ class Dependent(TimeStampedModel):
     full_name = models.CharField("Nome completo", max_length=150)
     birth_date = models.DateField("Data de nascimento", validators=[validate_not_future])
     cpf = models.CharField("CPF", max_length=11, blank=True, default="", validators=[validate_cpf])
+    email = models.EmailField("E-mail", blank=True, default="")
     relationship = models.CharField("Parentesco", max_length=20, choices=Relationship.choices)
     # Remoção é lógica: preserva o histórico usado em cobrança e prebenda
     is_active = models.BooleanField("Ativo", default=True)
