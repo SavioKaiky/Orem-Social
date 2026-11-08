@@ -47,8 +47,8 @@ const RELATIONSHIPS = [
 ];
 const relationshipLabel = (value: string) => RELATIONSHIPS.find((r) => r.value === value)?.label ?? value;
 
-type DependentDraft = { full_name: string; birth_date: string; cpf: string; relationship: string };
-const emptyDependent: DependentDraft = { full_name: '', birth_date: '', cpf: '', relationship: '' };
+type DependentDraft = { full_name: string; birth_date: string; cpf: string; email: string; relationship: string };
+const emptyDependent: DependentDraft = { full_name: '', birth_date: '', cpf: '', email: '', relationship: '' };
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -108,8 +108,11 @@ export default function RegisterScreen() {
     if (draft.full_name.trim().split(/\s+/).length < 2) return setError('Informe o nome completo do dependente.');
     if (!dateBrToIso(draft.birth_date)) return setError('Informe uma data de nascimento válida para o dependente.');
     if (!draft.relationship) return setError('Escolha o parentesco do dependente.');
-    if (draft.cpf && digits(draft.cpf).length !== 11) return setError('O CPF do dependente precisa ter 11 números.');
+    if (digits(draft.cpf).length !== 11) return setError('O CPF do dependente precisa ter 11 números.');
     setError(null);
+    if (!draft.email.trim()) return setError('Informe o e-mail do dependente.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) return setError('Informe um e-mail válido para o dependente.');
+
     setDependents((prev) => [...prev, draft]);
     setDraft(emptyDependent);
     setAdding(false);
@@ -138,7 +141,8 @@ export default function RegisterScreen() {
             full_name: d.full_name.trim(),
             birth_date: dateBrToIso(d.birth_date),
             relationship: d.relationship,
-            ...(digits(d.cpf) ? { cpf: digits(d.cpf) } : {}),
+            cpf: digits(d.cpf),
+            email: d.email.trim(),
           })),
         },
       });
@@ -216,7 +220,8 @@ export default function RegisterScreen() {
               <Field label="Nome completo do dependente" value={draft.full_name} onChangeText={(t) => setDraft({ ...draft, full_name: t })} autoCapitalize="words" />
               <Field label="Data de nascimento" value={draft.birth_date} onChangeText={(t) => setDraft({ ...draft, birth_date: maskDate(t) })} keyboardType="number-pad" placeholder="DD/MM/AAAA" />
               <Select label="Parentesco" value={draft.relationship} options={RELATIONSHIPS} onChange={(v) => setDraft({ ...draft, relationship: v })} />
-              <Field label="CPF (opcional)" value={draft.cpf} onChangeText={(t) => setDraft({ ...draft, cpf: maskCpf(t) })} keyboardType="number-pad" hint="Crianças pequenas podem não ter CPF." />
+              <Field label="CPF do dependente" value={draft.cpf} onChangeText={(t) => setDraft({ ...draft, cpf: maskCpf(t) })} keyboardType="number-pad" />
+              <Field label="E-mail do dependente" value={draft.email} onChangeText={(t) => setDraft({ ...draft, email: t })} keyboardType="email-address" autoCapitalize="none" />
               <Button title="Salvar dependente" onPress={saveDependent} />
               <Button title="Cancelar" variant="ghost" onPress={() => { setAdding(false); setDraft(emptyDependent); setError(null); }} />
             </Card>

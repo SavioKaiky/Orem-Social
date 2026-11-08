@@ -7,7 +7,13 @@ from accounts.tests.helpers import generate_cpf
 from members.models import Dependent
 
 URL = "/api/dependents/"
-BODY = {"full_name": "Pedro", "birth_date": "2012-03-04", "relationship": "child"}
+BODY = {
+    "full_name": "Pedro",
+    "birth_date": "2012-03-04",
+    "relationship": "child",
+    "cpf": generate_cpf("777888999"),
+    "email": "pedro@example.com",
+}
 
 
 def _make_dependent(beneficiary, **extra):
@@ -26,9 +32,14 @@ def test_beneficiary_creates_dependent_in_own_profile(api_client, make_beneficia
     assert Dependent.objects.get(pk=response.data["id"]).beneficiary == mine
 
 
-def test_dependent_cpf_is_optional(api_client, make_beneficiary):
+@pytest.mark.parametrize("field", ["cpf", "email"])
+def test_dependent_requires_cpf_and_email(api_client, make_beneficiary, field):
     api_client.force_authenticate(make_beneficiary().user)
-    assert api_client.post(URL, BODY, format="json").status_code == 201
+    body = BODY.copy()
+    del body[field]
+    response = api_client.post(URL, body, format="json")
+    assert response.status_code == 400
+    assert field in response.data
 
 
 def test_invalid_relationship_is_rejected(api_client, make_beneficiary):
