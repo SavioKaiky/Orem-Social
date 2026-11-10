@@ -81,10 +81,10 @@ export default function HomeScreen() {
             {billing.data.is_current ? (
               <>
                 <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.success }}>Em dia</Text>
-                <Body>Seus benefícios estão ativos até {formatDate(billing.data.covered_until)}.</Body>
+                <Body>Sua contribuição cobre o período até {formatDate(billing.data.covered_until)}.</Body>
                 <Body muted>
                   {billing.data.carence_met
-                    ? 'Carência cumprida: todos os benefícios estão liberados.'
+                    ? 'Carência geral de 4 meses cumprida.'
                     : `Carência em andamento (${billing.data.carence_months ?? 4} meses de contribuição contínua).`}
                 </Body>
               </>
@@ -96,7 +96,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.accent }}>Aguardando pagamento</Text>
-                <Body>Faça sua primeira contribuição para liberar os benefícios.</Body>
+                <Body>Faça sua primeira contribuição para ativar seu cadastro. A telemedicina não exige carência.</Body>
               </>
             )}
           </Card>
