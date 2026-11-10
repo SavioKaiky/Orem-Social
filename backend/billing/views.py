@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Role
 
-from .models import Notification, Payment, PricingConfig
+from .models import CARENCE_MONTHS, Notification, Payment, PricingConfig
 from .permissions import CanReadPayments, IsBeneficiary
 from .providers import get_provider
 from .rules import CARENCE_DAYS
@@ -76,6 +76,7 @@ class BillingSummaryView(APIView):
                 "is_current": subscription.is_current(now),
                 "carence_met": subscription.carence_met(now),
                 "carence_days": CARENCE_DAYS,
+                "carence_months": CARENCE_MONTHS,
                 "can_renew": can_renew(subscription, now),
                 "next_amount": amount,
                 "dependents_count": dependents_count,

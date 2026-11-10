@@ -46,7 +46,7 @@ export default function HomeScreen() {
                 <Body muted>
                   {billing.data.carence_met
                     ? 'Carência cumprida: todos os benefícios estão liberados.'
-                    : `Carência em andamento (${billing.data.carence_days} dias de contribuição contínua).`}
+                    : `Carência em andamento (${billing.data.carence_months ?? 4} meses de contribuição contínua).`}
                 </Body>
               </>
             ) : billing.data.status === 'inactive' ? (

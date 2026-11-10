@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -7,7 +8,9 @@ from django.utils import timezone
 from accounts.models import TimeStampedModel, User
 from members.models import BeneficiaryProfile
 
-from .rules import CARENCE_DAYS, GRACE_DAYS
+from .rules import GRACE_DAYS
+
+CARENCE_MONTHS = 4
 
 
 class PricingConfig(models.Model):
@@ -79,7 +82,12 @@ class Subscription(TimeStampedModel):
         now = now or timezone.now()
         if self.streak_started_at is None or not self.is_current(now):
             return False
-        return now >= self.streak_started_at + timedelta(days=CARENCE_DAYS)
+        start = timezone.localtime(self.streak_started_at)
+        month_offset = start.month - 1 + CARENCE_MONTHS
+        year = start.year + month_offset // 12
+        month = month_offset % 12 + 1
+        day = min(start.day, monthrange(year, month)[1])
+        return now >= start.replace(year=year, month=month, day=day)
 
     def __str__(self):
         return f"Assinatura de {self.beneficiary}"
