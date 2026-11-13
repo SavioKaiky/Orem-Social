@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
 import { api, messageOf } from '../lib/api';
+import { maskPhone } from '../lib/format';
 import { Paginated } from '../lib/types';
 import { Banner, Body, Button, Card } from './ui';
 
@@ -20,18 +21,40 @@ type WorkerSummary = {
 type Beneficiary = {
   id: number;
   full_name: string;
+  phone: string;
+  dependents: { id: number }[];
   status: BeneficiaryStatus;
 };
 
 export function WorkerDashboard({ userId }: { userId: number }) {
   const [page, setPage] = useState(1);
+  const [reportMonth, setReportMonth] = useState<Date | null>(null);
+  const currentMonth = new Date();
+  const monthFilter = reportMonth
+    ? `${reportMonth.getFullYear()}-${String(reportMonth.getMonth() + 1).padStart(2, '0')}`
+    : null;
+  const currentMonthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+
+  function selectMonth(month: Date | null) {
+    setReportMonth(month);
+    setPage(1);
+  }
+
+  function moveMonth(offset: number) {
+    if (reportMonth) {
+      selectMonth(new Date(reportMonth.getFullYear(), reportMonth.getMonth() + offset, 1));
+    }
+  }
   const summary = useQuery({
     queryKey: ['worker-beneficiaries-summary', userId],
     queryFn: () => api<WorkerSummary>('/beneficiaries/summary/'),
   });
   const beneficiaries = useQuery({
-    queryKey: ['worker-beneficiaries', userId, page],
-    queryFn: () => api<Paginated<Beneficiary>>(`/beneficiaries/?page=${page}`),
+    queryKey: ['worker-beneficiaries', userId, page, monthFilter],
+    queryFn: () => {
+      const monthParam = monthFilter ? `&month=${monthFilter}` : '';
+      return api<Paginated<Beneficiary>>(`/beneficiaries/?page=${page}${monthParam}`);
+    },
   });
 
   const counts = summary.data?.groups.reduce(
@@ -61,18 +84,37 @@ export function WorkerDashboard({ userId }: { userId: number }) {
         )}
       </Card>
 
-      <Body>Beneficiários vinculados</Body>
+      {reportMonth ? (
+        <Card>
+          <Body>Cadastros de {reportMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</Body>
+          <Button title="Mês anterior" variant="outline" onPress={() => moveMonth(-1)} />
+          {reportMonth < currentMonthStart ? (
+            <Button title="Próximo mês" variant="outline" onPress={() => moveMonth(1)} />
+          ) : null}
+          <Button title="Ver todos os beneficiários" variant="outline" onPress={() => selectMonth(null)} />
+        </Card>
+      ) : (
+        <Button title="Relatório mensal" variant="outline" onPress={() => selectMonth(currentMonthStart)} />
+      )}
+
+      {reportMonth ? null : <Body>Beneficiários vinculados</Body>}
       {beneficiaries.isError ? (
         <Banner kind="error">{messageOf(beneficiaries.error)}</Banner>
       ) : beneficiaries.data ? (
         <>
           {beneficiaries.data.results.length === 0 ? (
-            <Body muted>Nenhum beneficiário vinculado.</Body>
+            <Body muted>{reportMonth ? 'Nenhum cadastro neste mês.' : 'Nenhum beneficiário vinculado.'}</Body>
           ) : (
             beneficiaries.data.results.map((beneficiary) => (
               <Card key={beneficiary.id}>
                 <Body>{beneficiary.full_name}</Body>
                 <Body muted>{STATUS_LABELS[beneficiary.status]}</Body>
+                {reportMonth ? (
+                  <>
+                    <Body muted>Telefone: {beneficiary.phone ? maskPhone(beneficiary.phone) : 'Não informado'}</Body>
+                    <Body muted>Dependentes ativos: {beneficiary.dependents.length}</Body>
+                  </>
+                ) : null}
               </Card>
             ))
           )}

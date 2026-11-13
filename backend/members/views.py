@@ -1,7 +1,10 @@
+import re
+
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -93,8 +96,16 @@ class BeneficiaryViewSet(
         return queryset
 
     def get_queryset(self):
+        queryset = self.scoped_queryset()
+        month = self.request.query_params.get("month")
+        if self.action == "list" and month is not None:
+            if not re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", month) or not 1 <= int(month[:4]) <= 9998:
+                raise ValidationError({"month": "Informe o mês no formato AAAA-MM."})
+            year, month_number = map(int, month.split("-"))
+            queryset = queryset.filter(created_at__year=year, created_at__month=month_number)
+
         return (
-            self.scoped_queryset()
+            queryset
             .select_related("user", "worker__user")
             .prefetch_related(
                 Prefetch(
@@ -103,7 +114,7 @@ class BeneficiaryViewSet(
                     to_attr="active_dependents",
                 )
             )
-            .order_by("user__full_name")
+            .order_by("user__full_name", "pk")
         )
 
     @action(detail=False, methods=["get"], permission_classes=[CanViewReports])
