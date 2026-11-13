@@ -9,6 +9,7 @@ import { api, messageOf } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
 import { firstName, formatDate, formatMoney } from '../../src/lib/format';
 import { BillingSummary, Notification, Paginated } from '../../src/lib/types';
+import { WorkerDashboard } from '../../src/components/WorkerDashboard';
 import { colors, font } from '../../src/theme';
 
 export default function HomeScreen() {
@@ -66,7 +67,9 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      {!isBeneficiary ? (
+      {user.role === 'worker' ? (
+        <WorkerDashboard key={user.id} userId={user.id} />
+      ) : !isBeneficiary ? (
         <Card>
           <Body>O seu painel de gestão será liberado nas próximas atualizações do aplicativo.</Body>
         </Card>
