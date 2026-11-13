@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import { Alert, Linking, Text } from 'react-native';
 
 import { api, messageOf } from '../lib/api';
 import { maskPhone } from '../lib/format';
 import { Paginated } from '../lib/types';
+import { colors } from '../theme';
 import { Banner, Body, Button, Card } from './ui';
 
 const STATUS_LABELS = {
@@ -25,6 +27,17 @@ type Beneficiary = {
   dependents: { id: number }[];
   status: BeneficiaryStatus;
 };
+
+async function openDialer(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const number = phone.trimStart().startsWith('+') ? `+${digits}` : digits;
+
+  try {
+    await Linking.openURL(`tel:${number}`);
+  } catch {
+    Alert.alert('Não foi possível abrir o discador', 'Disque o número manualmente no aplicativo de telefone.');
+  }
+}
 
 export function WorkerDashboard({ userId }: { userId: number }) {
   const [page, setPage] = useState(1);
@@ -111,7 +124,18 @@ export function WorkerDashboard({ userId }: { userId: number }) {
                 <Body muted>{STATUS_LABELS[beneficiary.status]}</Body>
                 {reportMonth ? (
                   <>
-                    <Body muted>Telefone: {beneficiary.phone ? maskPhone(beneficiary.phone) : 'Não informado'}</Body>
+                    <Body muted>
+                      Telefone:{' '}
+                      {beneficiary.phone && /\d/.test(beneficiary.phone) ? (
+                        <Text
+                          accessibilityRole="link"
+                          accessibilityLabel={`Ligar para ${beneficiary.full_name}`}
+                          onPress={() => openDialer(beneficiary.phone)}
+                          style={{ color: colors.primary, textDecorationLine: 'underline' }}>
+                          {maskPhone(beneficiary.phone)}
+                        </Text>
+                      ) : 'Não informado'}
+                    </Body>
                     <Body muted>Dependentes ativos: {beneficiary.dependents.length}</Body>
                   </>
                 ) : null}
