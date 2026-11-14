@@ -1,6 +1,8 @@
 import pytest
+from django.utils import timezone
 
 from accounts.models import Role
+from billing.models import Payment, PaymentPurpose, PaymentStatus
 from members.models import BeneficiaryStatus, State
 
 
@@ -112,6 +114,55 @@ def test_summary_is_scoped_for_worker(api_client, make_user, make_beneficiary):
     make_beneficiary()
     api_client.force_authenticate(worker)
     assert api_client.get("/api/beneficiaries/summary/").data["total"] == 1
+
+
+def test_worker_retention_counts_each_confirmed_contributor_once(api_client, make_user, make_beneficiary):
+    worker = make_user(Role.WORKER)
+    active = make_beneficiary(worker=worker.worker_profile, status=BeneficiaryStatus.ACTIVE)
+    inactive = make_beneficiary(worker=worker.worker_profile, status=BeneficiaryStatus.INACTIVE)
+    pending = make_beneficiary(worker=worker.worker_profile)
+    active_without_contribution = make_beneficiary(
+        worker=worker.worker_profile, status=BeneficiaryStatus.ACTIVE
+    )
+    other = make_beneficiary(status=BeneficiaryStatus.ACTIVE)
+    for index, (beneficiary, purpose, status) in enumerate([
+        (active, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID),
+        (active, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID),
+        (inactive, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID),
+        (pending, PaymentPurpose.CONTRIBUTION, PaymentStatus.PENDING),
+        (active_without_contribution, PaymentPurpose.DONATION, PaymentStatus.PAID),
+        (other, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID),
+    ]):
+        Payment.objects.create(
+            beneficiary=beneficiary,
+            purpose=purpose,
+            status=status,
+            amount=50,
+            txid=f"retention-{index}",
+            expires_at=timezone.now(),
+            paid_at=timezone.now() if status == PaymentStatus.PAID else None,
+        )
+
+    api_client.force_authenticate(worker)
+    response = api_client.get("/api/beneficiaries/summary/")
+    assert response.data["total"] == 4
+    assert response.data["retention"] == {
+        "contributors": 2,
+        "active_contributors": 1,
+        "percentage": 50.0,
+    }
+
+
+def test_worker_retention_without_confirmed_contributions(api_client, make_user, make_beneficiary):
+    worker = make_user(Role.WORKER)
+    make_beneficiary(worker=worker.worker_profile)
+    api_client.force_authenticate(worker)
+    response = api_client.get("/api/beneficiaries/summary/")
+    assert response.data["retention"] == {
+        "contributors": 0,
+        "active_contributors": 0,
+        "percentage": None,
+    }
 
 
 def test_summary_forbidden_for_beneficiary(api_client, make_beneficiary):

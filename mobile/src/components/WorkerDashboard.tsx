@@ -17,6 +17,11 @@ const STATUS_LABELS = {
 type BeneficiaryStatus = keyof typeof STATUS_LABELS;
 type WorkerSummary = {
   total: number;
+  retention?: {
+    contributors: number;
+    active_contributors: number;
+    percentage: number | null;
+  };
   groups: { by_status: Partial<Record<BeneficiaryStatus, number>> }[];
 };
 
@@ -70,6 +75,7 @@ export function WorkerDashboard({ userId }: { userId: number }) {
     },
   });
 
+  const retention = summary.data?.retention;
   const counts = summary.data?.groups.reduce(
     (totals, { by_status }) => ({
       active: totals.active + (by_status.active ?? 0),
@@ -91,6 +97,18 @@ export function WorkerDashboard({ userId }: { userId: number }) {
             <Body>Adimplentes: {counts.active}</Body>
             <Body>Inadimplentes: {counts.inactive}</Body>
             <Body>Aguardando primeiro pagamento: {counts.pending}</Body>
+            {retention ? (
+              retention.percentage === null ? (
+                <Body muted>Retenção: nenhuma contribuição confirmada.</Body>
+              ) : (
+                <>
+                  <Body>Retenção: {retention.percentage.toLocaleString('pt-BR')}%</Body>
+                  <Body muted>
+                    {retention.active_contributors} de {retention.contributors} contribuintes estão em dia.
+                  </Body>
+                </>
+              )
+            ) : null}
           </>
         ) : (
           <Body muted>Carregando os totais...</Body>
