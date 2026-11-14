@@ -94,17 +94,17 @@ class BeneficiaryViewSet(
             if digits:
                 condition |= Q(user__cpf__startswith=digits)
             queryset = queryset.filter(condition)
-        return queryset
-
-    def get_queryset(self):
-        queryset = self.scoped_queryset()
         month = self.request.query_params.get("month")
-        if self.action == "list" and month is not None:
+        if self.action in ("list", "summary") and month is not None:
             if not re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", month) or not 1 <= int(month[:4]) <= 9998:
                 raise ValidationError({"month": "Informe o mês no formato AAAA-MM."})
             year, month_number = map(int, month.split("-"))
             queryset = queryset.filter(created_at__year=year, created_at__month=month_number)
 
+        return queryset
+
+    def get_queryset(self):
+        queryset = self.scoped_queryset()
         return (
             queryset
             .select_related("user", "worker__user")
