@@ -14,6 +14,14 @@ type BeneficiarySummary = {
   }[];
 };
 
+type WorkerRankingEntry = {
+  id: number;
+  full_name: string;
+  code: string | null;
+  total: number;
+  active: number;
+};
+
 export function BishopDashboard({ userId }: { userId: number }) {
   const summary = useQuery({
     queryKey: ['bishop-beneficiaries-summary', userId],
@@ -22,6 +30,10 @@ export function BishopDashboard({ userId }: { userId: number }) {
   const revenue = useQuery({
     queryKey: ['bishop-monthly-revenue', userId],
     queryFn: () => api<{ month: string; total: string }>('/billing/payments/monthly-revenue/'),
+  });
+  const ranking = useQuery({
+    queryKey: ['bishop-worker-ranking', userId],
+    queryFn: () => api<WorkerRankingEntry[]>('/workers/ranking/'),
   });
   const counts = summary.data?.groups.reduce(
     (totals, { by_status }) => ({
@@ -49,6 +61,26 @@ export function BishopDashboard({ userId }: { userId: number }) {
           <Body muted>Carregando os totais...</Body>
         )}
       </Card>
+      
+      <Card>
+        <Body>Ranking de obreiros</Body>
+        <Body muted>Até 10 obreiros por número de beneficiários vinculados</Body>
+        {ranking.isError ? (
+          <Banner kind="error">{messageOf(ranking.error)}</Banner>
+        ) : !ranking.data ? (
+          <Body muted>Carregando o ranking...</Body>
+        ) : ranking.data.length === 0 ? (
+          <Body muted>Nenhum obreiro com beneficiários vinculados.</Body>
+        ) : (
+          ranking.data.map((worker, index) => (
+            <React.Fragment key={worker.id}>
+              <Body>{index + 1}. {worker.full_name}{worker.code ? ` (${worker.code})` : ''}</Body>
+              <Body muted>Vinculados: {worker.total} · Adimplentes: {worker.active}</Body>
+            </React.Fragment>
+          ))
+        )}
+      </Card>
+
       <Card>
         <Body>Receita de contribuições no mês</Body>
         {revenue.isError ? (
