@@ -7,7 +7,11 @@ import { Banner, Body, Card } from './ui';
 
 type BeneficiarySummary = {
   total: number;
-  groups: { by_status: Partial<Record<'active' | 'inactive' | 'pending', number>> }[];
+  groups: {
+    state: string;
+    total: number;
+    by_status: Partial<Record<'active' | 'inactive' | 'pending', number>>;
+  }[];
 };
 
 export function BishopDashboard({ userId }: { userId: number }) {
@@ -58,6 +62,24 @@ export function BishopDashboard({ userId }: { userId: number }) {
           <Body muted>Carregando a receita...</Body>
         )}
       </Card>
+      {summary.data && !summary.isError ? (
+        <>
+          <Body>Beneficiários por UF</Body>
+          {summary.data.groups.length === 0 ? (
+            <Body muted>Nenhum beneficiário cadastrado.</Body>
+          ) : (
+            summary.data.groups.map(({ state, total, by_status }) => (
+              <Card key={state}>
+                <Body>{state}</Body>
+                <Body>Cadastrados: {total}</Body>
+                <Body>Adimplentes: {by_status.active ?? 0}</Body>
+                <Body>Inadimplentes: {by_status.inactive ?? 0}</Body>
+                <Body>Aguardando primeiro pagamento: {by_status.pending ?? 0}</Body>
+              </Card>
+            ))
+          )}
+        </>
+      ) : null}
     </>
   );
 }
