@@ -1,3 +1,4 @@
+from datetime import datetime, timezone as utc_timezone
 from decimal import Decimal
 
 import pytest
@@ -8,6 +9,7 @@ from billing.models import (
     Notification,
     NotificationKind,
     Payment,
+    PaymentPurpose,
     PaymentStatus,
     Subscription,
     UnidentifiedPayment,
@@ -204,3 +206,53 @@ def test_mark_all_notifications_read_only_updates_current_user(api_client, make_
     other_notification.refresh_from_db()
     assert owned.read_at is not None
     assert other_notification.read_at is None
+
+
+
+@pytest.mark.parametrize("role", [Role.BISHOP, Role.ADMIN])
+def test_monthly_revenue_totals_paid_contributions_by_local_payment_date(
+    api_client, make_user, make_beneficiary, monkeypatch, role
+):
+    monkeypatch.setattr(timezone, "now", lambda: datetime(2026, 11, 14, tzinfo=utc_timezone.utc))
+    first = make_beneficiary()
+    second = make_beneficiary()
+    november_start = datetime(2026, 11, 1, 3, tzinfo=utc_timezone.utc)
+    for index, (beneficiary, purpose, status, paid_at, amount) in enumerate([
+        (first, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID, november_start, Decimal("25.10")),
+        (second, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID, november_start, Decimal("34.25")),
+        (first, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID,
+         datetime(2026, 11, 1, 2, 59, tzinfo=utc_timezone.utc), Decimal("40.00")),
+        (first, PaymentPurpose.CONTRIBUTION, PaymentStatus.PAID,
+         datetime(2026, 12, 1, 3, tzinfo=utc_timezone.utc), Decimal("40.00")),
+        (first, PaymentPurpose.DONATION, PaymentStatus.PAID, november_start, Decimal("40.00")),
+        (first, PaymentPurpose.CONTRIBUTION, PaymentStatus.PENDING, None, None),
+        (first, PaymentPurpose.CONTRIBUTION, PaymentStatus.EXPIRED, None, None),
+    ]):
+        Payment.objects.create(
+            beneficiary=beneficiary,
+            purpose=purpose,
+            status=status,
+            amount=Decimal("40.00"),
+            paid_amount=amount,
+            paid_at=paid_at,
+            expires_at=november_start,
+            txid=f"monthly-revenue-{index}",
+        )
+
+    api_client.force_authenticate(make_user(role))
+    response = api_client.get("/api/billing/payments/monthly-revenue/")
+    assert response.status_code == 200
+    assert response.data == {"month": "2026-11", "total": "59.35"}
+
+
+@pytest.mark.parametrize("role", [Role.BENEFICIARY, Role.WORKER, Role.PROVIDER])
+def test_monthly_revenue_restricted_to_admin_and_bishop(api_client, make_user, role):
+    api_client.force_authenticate(make_user(role))
+    assert api_client.get("/api/billing/payments/monthly-revenue/").status_code == 403
+
+
+def test_monthly_revenue_without_payments(api_client, make_user):
+    api_client.force_authenticate(make_user(Role.BISHOP))
+    response = api_client.get("/api/billing/payments/monthly-revenue/")
+    assert response.status_code == 200
+    assert response.data["total"] == "0.00"
