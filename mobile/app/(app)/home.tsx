@@ -9,6 +9,7 @@ import { api, messageOf } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
 import { firstName, formatDate, formatMoney } from '../../src/lib/format';
 import { BillingSummary, Notification, Paginated } from '../../src/lib/types';
+import { WorkerDashboard } from '../../src/components/WorkerDashboard';
 import { colors, font } from '../../src/theme';
 
 export default function HomeScreen() {
@@ -66,7 +67,9 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      {!isBeneficiary ? (
+      {user.role === 'worker' ? (
+        <WorkerDashboard key={user.id} userId={user.id} />
+      ) : !isBeneficiary ? (
         <Card>
           <Body>O seu painel de gestão será liberado nas próximas atualizações do aplicativo.</Body>
         </Card>
@@ -81,11 +84,11 @@ export default function HomeScreen() {
             {billing.data.is_current ? (
               <>
                 <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.success }}>Em dia</Text>
-                <Body>Seus benefícios estão ativos até {formatDate(billing.data.covered_until)}.</Body>
+                <Body>Sua contribuição cobre o período até {formatDate(billing.data.covered_until)}.</Body>
                 <Body muted>
                   {billing.data.carence_met
-                    ? 'Carência cumprida: todos os benefícios estão liberados.'
-                    : `Carência em andamento (${billing.data.carence_days} dias de contribuição contínua).`}
+                    ? 'Carência geral de 4 meses cumprida.'
+                    : `Carência em andamento (${billing.data.carence_months ?? 4} meses de contribuição contínua).`}
                 </Body>
               </>
             ) : billing.data.status === 'inactive' ? (
@@ -96,7 +99,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 <Text style={{ fontSize: font.title, fontWeight: '700', color: colors.accent }}>Aguardando pagamento</Text>
-                <Body>Faça sua primeira contribuição para liberar os benefícios.</Body>
+                <Body>Faça sua primeira contribuição para ativar seu cadastro. A telemedicina não exige carência.</Body>
               </>
             )}
           </Card>

@@ -1,7 +1,10 @@
-from django.db.models import Count, Prefetch, Q
+import re
+
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -9,8 +12,9 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from accounts.models import Role
 from accounts.validators import only_digits
+from billing.models import Payment, PaymentPurpose, PaymentStatus
 
-from .models import BeneficiaryProfile, Dependent, TermsVersion
+from .models import BeneficiaryProfile, BeneficiaryStatus, Dependent, TermsVersion
 from .permissions import CanViewReports, MemberDataAccess
 from .serializers import (
     BeneficiaryRegistrationSerializer,
@@ -93,8 +97,16 @@ class BeneficiaryViewSet(
         return queryset
 
     def get_queryset(self):
+        queryset = self.scoped_queryset()
+        month = self.request.query_params.get("month")
+        if self.action == "list" and month is not None:
+            if not re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", month) or not 1 <= int(month[:4]) <= 9998:
+                raise ValidationError({"month": "Informe o mês no formato AAAA-MM."})
+            year, month_number = map(int, month.split("-"))
+            queryset = queryset.filter(created_at__year=year, created_at__month=month_number)
+
         return (
-            self.scoped_queryset()
+            queryset
             .select_related("user", "worker__user")
             .prefetch_related(
                 Prefetch(
@@ -103,14 +115,15 @@ class BeneficiaryViewSet(
                     to_attr="active_dependents",
                 )
             )
-            .order_by("user__full_name")
+            .order_by("user__full_name", "pk")
         )
 
     @action(detail=False, methods=["get"], permission_classes=[CanViewReports])
     def summary(self, request):
         """Totais por grupo regional (estado) e situação, respeitando o recorte do usuário."""
+        queryset = self.scoped_queryset()
         rows = (
-            self.scoped_queryset()
+            queryset
             .order_by("state")
             .values("state", "status")
             .annotate(total=Count("id"))
@@ -124,7 +137,25 @@ class BeneficiaryViewSet(
             group["total"] += row["total"]
             group["by_status"][row["status"]] = row["total"]
         data = list(groups.values())
-        return Response({"total": sum(g["total"] for g in data), "groups": data})
+        result = {"total": sum(g["total"] for g in data), "groups": data}
+        if request.user.role == Role.WORKER:
+            confirmed_contributions = Payment.objects.filter(
+                beneficiary_id=OuterRef("pk"),
+                purpose=PaymentPurpose.CONTRIBUTION,
+                status=PaymentStatus.PAID,
+            )
+            retention = queryset.filter(Exists(confirmed_contributions)).aggregate(
+                contributors=Count("pk"),
+                active_contributors=Count("pk", filter=Q(status=BeneficiaryStatus.ACTIVE)),
+            )
+            contributors = retention["contributors"]
+            retention["percentage"] = (
+                round(100 * retention["active_contributors"] / contributors, 2)
+                if contributors
+                else None
+            )
+            result["retention"] = retention
+        return Response(result)
 
 
 class DependentViewSet(viewsets.ModelViewSet):

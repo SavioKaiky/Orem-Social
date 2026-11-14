@@ -17,6 +17,7 @@ export type BillingSummary = {
   is_current: boolean;
   carence_met: boolean;
   carence_days: number;
+  carence_months: number;
   can_renew: boolean;
   next_amount: string;
   dependents_count: number;

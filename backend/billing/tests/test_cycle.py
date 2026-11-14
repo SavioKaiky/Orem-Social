@@ -124,13 +124,20 @@ def test_unknown_txid_goes_to_unidentified(db):
     assert UnidentifiedPayment.objects.count() == 1
 
 
-def test_carence_needs_four_months_of_continuous_payments(make_beneficiary):
+@pytest.mark.parametrize(
+    ("first_payment", "carence_end"),
+    [
+        (datetime(2026, 6, 10, 12, tzinfo=dt_timezone.utc), datetime(2026, 10, 10, 12, tzinfo=dt_timezone.utc)),
+        (datetime(2026, 10, 31, 12, tzinfo=dt_timezone.utc), datetime(2027, 2, 28, 12, tzinfo=dt_timezone.utc)),
+    ],
+)
+def test_carence_needs_four_calendar_months(make_beneficiary, first_payment, carence_end):
     beneficiary = make_beneficiary()
     for offset in (0, 30, 60, 90):
-        pay(beneficiary, T0 + days(offset))
+        pay(beneficiary, first_payment + days(offset))
     subscription = get_subscription(beneficiary)
-    assert subscription.carence_met(T0 + days(119)) is False
-    assert subscription.carence_met(T0 + days(120)) is True
+    assert subscription.carence_met(carence_end - timedelta(seconds=1)) is False
+    assert subscription.carence_met(carence_end) is True
 
 
 def test_sync_deactivates_after_grace_and_notifies_once(make_beneficiary):
