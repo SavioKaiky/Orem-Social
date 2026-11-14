@@ -1,6 +1,8 @@
+from datetime import datetime, time, timedelta
 from uuid import uuid4
 
 from django.conf import settings
+from django.db.models import Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -11,8 +13,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Role
+from accounts.permissions import IsAdminOrBishopReadOnly
 
-from .models import CARENCE_MONTHS, Notification, Payment, PricingConfig
+from .models import CARENCE_MONTHS, Notification, Payment, PaymentPurpose, PaymentStatus, PricingConfig
 from .permissions import CanReadPayments, IsBeneficiary
 from .providers import get_provider
 from .rules import CARENCE_DAYS
@@ -109,6 +112,21 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
         if self.request.user.role == Role.BENEFICIARY:
             queryset = queryset.filter(beneficiary__user=self.request.user)
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="monthly-revenue", permission_classes=[IsAdminOrBishopReadOnly])
+    def monthly_revenue(self, request):
+        """Total de contribuições recebidas no mês civil corrente."""
+        month_start = timezone.localdate().replace(day=1)
+        next_month_start = (month_start + timedelta(days=31)).replace(day=1)
+        start = timezone.make_aware(datetime.combine(month_start, time.min))
+        end = timezone.make_aware(datetime.combine(next_month_start, time.min))
+        total = self.get_queryset().filter(
+            purpose=PaymentPurpose.CONTRIBUTION,
+            status=PaymentStatus.PAID,
+            paid_at__gte=start,
+            paid_at__lt=end,
+        ).aggregate(total=Sum("paid_amount", default=0))["total"]
+        return Response({"month": month_start.strftime("%Y-%m"), "total": format(total, ".2f")})
 
 
 class NotificationViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

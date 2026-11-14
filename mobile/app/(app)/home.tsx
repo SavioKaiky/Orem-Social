@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { BishopDashboard } from '../../src/components/BishopDashboard';
 import { Banner, Body, Button, Card, Loading, Screen, Title } from '../../src/components/ui';
 import { api, messageOf } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
@@ -69,6 +70,8 @@ export default function HomeScreen() {
 
       {user.role === 'worker' ? (
         <WorkerDashboard key={user.id} userId={user.id} />
+      ) : user.role === 'bishop' ? (
+        <BishopDashboard userId={user.id} />
       ) : !isBeneficiary ? (
         <Card>
           <Body>O seu painel de gestão será liberado nas próximas atualizações do aplicativo.</Body>
