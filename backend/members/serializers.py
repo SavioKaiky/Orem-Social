@@ -6,8 +6,9 @@ from django.db import transaction
 from rest_framework import serializers
 
 from accounts.models import Role, User, WorkerProfile
-from accounts.validators import only_digits
+from accounts.validators import normalize_phone, only_digits
 from accounts.validators import validate_cpf as check_cpf
+from accounts.validators import validate_phone
 
 from .models import (
     BeneficiaryProfile,
@@ -45,16 +46,15 @@ class TermsSerializer(serializers.ModelSerializer):
 class DependentInputSerializer(serializers.ModelSerializer):
     """Dados do dependente. Usado no cadastro do titular e como base da API de dependentes."""
 
-    cpf = serializers.CharField(required=False, allow_blank=True, validators=[check_cpf])
+    cpf = serializers.CharField(validators=[check_cpf])
+    email = serializers.EmailField(max_length=254)
 
     class Meta:
         model = Dependent
-        fields = ["full_name", "birth_date", "cpf", "relationship"]
+        fields = ["full_name", "birth_date", "cpf", "email", "relationship"]
 
     def validate_cpf(self, value):
         cpf = only_digits(value)
-        if not cpf:
-            return ""
         queryset = Dependent.objects.filter(cpf=cpf)
         if self.instance is not None:
             queryset = queryset.exclude(pk=self.instance.pk)
@@ -69,7 +69,7 @@ class DependentSerializer(DependentInputSerializer):
     )
 
     class Meta(DependentInputSerializer.Meta):
-        fields = ["id", "beneficiary", "full_name", "birth_date", "cpf", "relationship", "created_at"]
+        fields = ["id", "beneficiary", "full_name", "birth_date", "cpf", "email", "relationship", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate(self, attrs):
@@ -104,6 +104,14 @@ class BeneficiarySerializer(serializers.ModelSerializer):
         # O titular só altera contato, cidade e estado; status vem do pagamento
         read_only_fields = ["id", "birth_date", "status", "created_at"]
 
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        validate_phone(phone)
+        queryset = User.objects.filter(phone=phone).exclude(pk=self.instance.user_id)
+        if queryset.exists():
+            raise serializers.ValidationError("Já existe um usuário com este telefone.")
+        return phone
+
     def get_dependents(self, obj):
         items = getattr(obj, "active_dependents", None)
         if items is None:
@@ -128,7 +136,7 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
 
     cpf = serializers.CharField(validators=[check_cpf])
     full_name = serializers.CharField(max_length=150)
-    email = serializers.EmailField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=True, allow_blank=False)
     phone = serializers.CharField(max_length=20)
     password = serializers.CharField(write_only=True, min_length=8)
     birth_date = serializers.DateField(validators=[validate_not_future])
@@ -137,6 +145,13 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
     worker_code = serializers.CharField(max_length=20)
     accept_terms = serializers.BooleanField()
     dependents = DependentInputSerializer(many=True, required=False)
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        validate_phone(phone)
+        if User.objects.filter(phone=phone).exists():
+            raise serializers.ValidationError("Já existe um usuário com este telefone.")
+        return phone
 
     def validate_cpf(self, value):
         cpf = only_digits(value)
@@ -179,7 +194,7 @@ class BeneficiaryRegistrationSerializer(serializers.Serializer):
             cpf=validated_data["cpf"],
             password=validated_data["password"],
             full_name=validated_data["full_name"],
-            email=validated_data.get("email", ""),
+            email=validated_data["email"],
             phone=validated_data["phone"],
             role=Role.BENEFICIARY,
         )

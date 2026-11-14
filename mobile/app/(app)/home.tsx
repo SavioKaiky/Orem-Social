@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Banner, Body, Button, Card, Loading, Screen, Title } from '../../src/components/ui';
 import { api, messageOf } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth';
 import { firstName, formatDate, formatMoney } from '../../src/lib/format';
-import { BillingSummary } from '../../src/lib/types';
+import { BillingSummary, Notification, Paginated } from '../../src/lib/types';
 import { colors, font } from '../../src/theme';
 
 export default function HomeScreen() {
@@ -21,11 +22,49 @@ export default function HomeScreen() {
     enabled: isBeneficiary,
   });
 
+  const notifications = useQuery({
+    queryKey: ['billing-notifications', 1],
+    queryFn: () => api<Paginated<Notification>>('/billing/notifications/'),
+    enabled: isBeneficiary,
+  });
+
   if (!user) return <Loading />;
+
+  const unreadCount = notifications.data?.results.filter((notification) => !notification.read_at).length ?? 0;
 
   return (
     <Screen>
-      <Title>Olá, {firstName(user.full_name)}!</Title>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Title>Olá, {firstName(user.full_name)}!</Title>
+        {isBeneficiary ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount ? `Notificações, ${unreadCount} não lidas` : 'Notificações'}
+            onPress={() => router.push('/notifications')}
+            style={{ padding: 8 }}>
+            <Ionicons name="notifications-outline" size={26} color={colors.primary} />
+            {unreadCount > 0 ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  minWidth: 18,
+                  height: 18,
+                  paddingHorizontal: 4,
+                  borderRadius: 9,
+                  backgroundColor: colors.danger,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
+      </View>
 
       {!isBeneficiary ? (
         <Card>

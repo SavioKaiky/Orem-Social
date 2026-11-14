@@ -89,7 +89,7 @@ def create_contribution_charge(beneficiary, now=None):
 
 
 def _record_unidentified(txid, end_to_end_id, amount, reason):
-    UnidentifiedPayment.objects.get_or_create(
+    return UnidentifiedPayment.objects.get_or_create(
         end_to_end_id=end_to_end_id,
         defaults={"txid": txid or "", "amount": amount, "reason": reason},
     )
@@ -108,7 +108,22 @@ def confirm_payment(*, txid, end_to_end_id, amount, paid_at):
     if payment.status == PaymentStatus.PAID:
         return payment
     if amount != payment.amount:
-        _record_unidentified(txid, end_to_end_id, amount, "Valor pago diferente do valor cobrado.")
+        unidentified, created = _record_unidentified(
+            txid, end_to_end_id, amount, "Valor pago diferente do valor cobrado."
+        )
+        if created:
+            Notification.objects.get_or_create(
+                dedupe_key=f"unidentified-payment-{unidentified.pk}",
+                defaults={
+                    "user": payment.beneficiary.user,
+                    "kind": NotificationKind.UNIDENTIFIED_PAYMENT,
+                    "title": "Não identificamos seu pagamento",
+                    "body": (
+                        "Recebemos um PIX, mas o valor não corresponde à cobrança. "
+                        "Nossa equipe vai verificar. Se necessário, entre em contato com a administração."
+                    ),
+                },
+            )
         return None
 
     payment.status = PaymentStatus.PAID

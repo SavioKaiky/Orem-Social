@@ -150,6 +150,7 @@ class UnidentifiedPayment(models.Model):
 class NotificationKind(models.TextChoices):
     DUE_SOON = "due_soon", "Vencimento próximo"
     OVERDUE = "overdue", "Pagamento não identificado"
+    UNIDENTIFIED_PAYMENT = "unidentified_payment", "PIX não identificado"
 
 
 class Notification(models.Model):

@@ -1,10 +1,19 @@
+from django import forms
 from django.contrib import admin
 
 from .models import BeneficiaryProfile, Dependent, TermsAcceptance, TermsVersion
 
 
+class DependentInlineForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in ("cpf", "email"):
+            self.fields[field].required = self.instance.pk is None or bool(getattr(self.instance, field))
+
+
 class DependentInline(admin.TabularInline):
     model = Dependent
+    form = DependentInlineForm
     extra = 0
 
 

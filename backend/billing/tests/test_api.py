@@ -123,6 +123,25 @@ def test_webhook_unknown_txid_is_queued_for_admin(api_client, db, settings):
     response = api_client.post(f"{WEBHOOK}?hmac=segredo", body, format="json")
     assert response.status_code == 200
     assert UnidentifiedPayment.objects.count() == 1
+    assert not Notification.objects.filter(kind=NotificationKind.UNIDENTIFIED_PAYMENT).exists()
+
+
+def test_webhook_wrong_amount_notifies_beneficiary_once(api_client, make_beneficiary, settings):
+    settings.PIX_WEBHOOK_SECRET = "segredo"
+    beneficiary = make_beneficiary()
+    payment = create_contribution_charge(beneficiary)
+    body = _webhook_body(payment, amount=Decimal("10.00"), e2e="E1")
+
+    for _ in range(2):
+        response = api_client.post(f"{WEBHOOK}?hmac=segredo", body, format="json")
+        assert response.status_code == 200
+
+    notification = Notification.objects.get(kind=NotificationKind.UNIDENTIFIED_PAYMENT)
+    assert notification.user == beneficiary.user
+    assert notification.title == "Não identificamos seu pagamento"
+    assert Notification.objects.filter(kind=NotificationKind.UNIDENTIFIED_PAYMENT).count() == 1
+    payment.refresh_from_db()
+    assert payment.status == PaymentStatus.PENDING
 
 
 def test_payments_list_is_scoped(api_client, make_user, make_beneficiary):
@@ -164,3 +183,24 @@ def test_notifications_are_private(api_client, make_user):
     assert api_client.get("/api/billing/notifications/").data["count"] == 1
     api_client.force_authenticate(other)
     assert api_client.get("/api/billing/notifications/").data["count"] == 0
+
+
+def test_mark_all_notifications_read_only_updates_current_user(api_client, make_user):
+    owner = make_user()
+    other = make_user()
+    owned = Notification.objects.create(
+        user=owner, kind=NotificationKind.DUE_SOON, title="t", body="b", dedupe_key="x-owner"
+    )
+    other_notification = Notification.objects.create(
+        user=other, kind=NotificationKind.DUE_SOON, title="t", body="b", dedupe_key="x-other"
+    )
+
+    api_client.force_authenticate(owner)
+    response = api_client.post("/api/billing/notifications/mark-all-read/")
+
+    assert response.status_code == 200
+    assert response.data["updated"] == 1
+    owned.refresh_from_db()
+    other_notification.refresh_from_db()
+    assert owned.read_at is not None
+    assert other_notification.read_at is None

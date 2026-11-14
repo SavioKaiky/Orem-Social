@@ -9,7 +9,7 @@ import { User } from './types';
 type AuthState = {
   user: User | null;
   loading: boolean;
-  login: (cpf: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -41,10 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setSessionExpiredHandler(null);
   }, [queryClient]);
 
-  const login = useCallback(async (cpf: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string) => {
     const data = await api<{ access: string; refresh: string; user: User }>('/auth/login/', {
       method: 'POST',
-      body: { cpf: digits(cpf), password },
+      body: { identifier: digits(identifier), password },
       auth: false,
     });
     await saveTokens({ access: data.access, refresh: data.refresh });

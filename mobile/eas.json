@@ -7,12 +7,25 @@
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://api.kaiky.org/api" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.kaiky.org/api",
+        "EXPO_PUBLIC_ENABLE_PAYMENT_SIMULATOR": "true"
+      }
+    },
+    "closedtest": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.kaiky.org/api",
+        "EXPO_PUBLIC_ENABLE_PAYMENT_SIMULATOR": "true"
+      }
     },
     "production": {
       "autoIncrement": true,
       "android": { "buildType": "app-bundle" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://api.kaiky.org/api" }
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.kaiky.org/api"
+      }
     }
   },
   "submit": {

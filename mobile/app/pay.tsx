@@ -12,6 +12,11 @@ import { formatMoney } from '../src/lib/format';
 import { BillingSummary, Payment, PaymentMethodInfo } from '../src/lib/types';
 import { colors, radius, spacing } from '../src/theme';
 
+// O botão de simulação aparece no Expo Go (__DEV__) e nos builds de teste, que ligam esta variável
+// no eas.json. O perfil "production" não a define, então o app público nunca mostra o botão.
+const SIMULATOR_ENABLED =
+  __DEV__ || process.env.EXPO_PUBLIC_ENABLE_PAYMENT_SIMULATOR === 'true';
+
 export default function PayScreen() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -107,9 +112,9 @@ export default function PayScreen() {
             A simulação falhou: {messageOf(simulate.error)} Confira se o backend está com DJANGO_DEBUG=True.
           </Banner>
         ) : null}
-        {__DEV__ ? (
+        {SIMULATOR_ENABLED ? (
           <Button
-            title="Simular pagamento (só em desenvolvimento)"
+            title="Simular pagamento (apenas em testes)"
             variant="outline"
             onPress={() => simulate.mutate(current.txid)}
             loading={simulate.isPending}

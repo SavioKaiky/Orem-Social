@@ -22,11 +22,18 @@ def payload(make_user):
         "worker_code": worker.code,
         "accept_terms": True,
         "dependents": [
-            {"full_name": "João Silva", "birth_date": "2010-06-01", "relationship": "child"},
+            {
+                "full_name": "João Silva",
+                "birth_date": "2010-06-01",
+                "cpf": generate_cpf("222333444"),
+                "email": "joao@example.com",
+                "relationship": "child",
+            },
             {
                 "full_name": "Ana Silva",
                 "birth_date": "1960-02-10",
                 "cpf": generate_cpf("444555666"),
+                "email": "ana@example.com",
                 "relationship": "parent",
             },
         ],
@@ -46,6 +53,7 @@ def test_register_creates_everything(api_client, current_terms, payload):
     assert response.data["group"] == "OREM/GO"
     assert response.data["worker_code"] == payload["worker_code"]
     assert len(response.data["dependents"]) == 2
+    assert {d["email"] for d in response.data["dependents"]} == {"joao@example.com", "ana@example.com"}
 
     user = User.objects.get(cpf=payload["cpf"])
     assert user.role == Role.BENEFICIARY
@@ -122,6 +130,14 @@ def test_duplicate_cpf_is_rejected(api_client, current_terms, payload):
     assert api_client.post(URL, payload, format="json").status_code == 400
 
 
+def test_duplicate_phone_is_rejected_after_normalization(api_client, current_terms, payload, make_user):
+    make_user(phone="(62) 99999-0000")
+    payload["phone"] = "+55 (62) 99999-0000"
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "phone" in response.data
+
+
 def test_repeated_dependent_cpf_is_rejected(api_client, current_terms, payload):
     repeated = generate_cpf("444555666")
     for dependent in payload["dependents"]:
@@ -132,3 +148,27 @@ def test_repeated_dependent_cpf_is_rejected(api_client, current_terms, payload):
 def test_register_fails_without_current_terms(api_client, payload):
     TermsVersion.objects.update(is_current=False)
     assert api_client.post(URL, payload, format="json").status_code == 400
+
+@pytest.mark.parametrize("email", ["", "   ", None, "sem-arroba", "maria@", "maria@example.com outra@example.com"])
+def test_registration_rejects_invalid_email(api_client, current_terms, payload, email):
+    """E-mail vazio, nulo ou inválido não pode criar o cadastro."""
+    payload["email"] = email
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "email" in response.data
+    assert not User.objects.filter(cpf=payload["cpf"]).exists()
+
+
+def test_registration_requires_email(api_client, current_terms, payload):
+    del payload["email"]
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 400
+    assert "email" in response.data
+    assert not User.objects.filter(cpf=payload["cpf"]).exists()
+
+
+def test_registration_trims_and_saves_email(api_client, current_terms, payload):
+    payload["email"] = "  maria@example.com  "
+    response = api_client.post(URL, payload, format="json")
+    assert response.status_code == 201
+    assert User.objects.get(cpf=payload["cpf"]).email == "maria@example.com"
