@@ -2,16 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
 import { api, messageOf } from '../lib/api';
-import { formatMoney } from '../lib/format';
 import { Banner, Body, Button, Card } from './ui';
 
 type BeneficiarySummary = {
   total: number;
-  prebenda?: {
-    active_holders: number;
-    active_dependents: number;
-    total_reais: number;
-  };
   groups: {
     state: string;
     total: number;
@@ -49,16 +43,11 @@ export function BishopDashboard({ userId }: { userId: number }) {
     queryKey: ['bishop-beneficiaries-summary', userId],
     queryFn: () => api<BeneficiarySummary>('/beneficiaries/summary/'),
   });
-  const revenue = useQuery({
-    queryKey: ['bishop-monthly-revenue', userId],
-    queryFn: () => api<{ month: string; total: string }>('/billing/payments/monthly-revenue/'),
-  });
   const ranking = useQuery({
     queryKey: ['bishop-worker-ranking', userId],
     queryFn: () => api<WorkerRankingEntry[]>('/workers/ranking/'),
   });
   const reportQuery = month ? report : summary;
-  const prebenda = summary.data?.prebenda;
   const counts = summary.data?.groups.reduce(
     (totals, { by_status }) => ({
       active: totals.active + (by_status.active ?? 0),
@@ -115,27 +104,6 @@ export function BishopDashboard({ userId }: { userId: number }) {
         )}
       </Card>
 
-      <Card>
-        <Body>Receita de contribuições no mês</Body>
-        {revenue.isError ? (
-          <Banner kind="error">{messageOf(revenue.error)}</Banner>
-        ) : revenue.data ? (
-          <>
-            <Body>{formatMoney(revenue.data.total)}</Body>
-            <Body muted>{revenue.data.month.split('-').reverse().join('/')}</Body>
-          </>
-        ) : (
-          <Body muted>Carregando a receita...</Body>
-        )}
-      </Card>
-      {prebenda && !summary.isError ? (
-        <Card>
-          <Body>Prebenda estimada</Body>
-          <Body>{formatMoney(prebenda.total_reais)}</Body>
-          <Body muted>Titulares adimplentes: {prebenda.active_holders} × R$ 2,00</Body>
-          <Body muted>Dependentes ativos desses titulares: {prebenda.active_dependents} × R$ 1,00</Body>
-        </Card>
-      ) : null}
       <Card>
         <Body>Beneficiários por UF</Body>
         <Body muted>
