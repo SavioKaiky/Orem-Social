@@ -35,6 +35,14 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="worker-finance"
+        options={{
+          title: 'Financeiro',
+          href: user.role === 'worker' ? '/(app)/worker-finance' : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size} color={color as string} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',

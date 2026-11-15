@@ -209,12 +209,14 @@ def test_mark_all_notifications_read_only_updates_current_user(api_client, make_
 
 
 
-@pytest.mark.parametrize("role", [Role.BISHOP, Role.ADMIN])
+@pytest.mark.parametrize("role", [Role.BISHOP, Role.ADMIN, Role.WORKER])
 def test_monthly_revenue_totals_paid_contributions_by_local_payment_date(
     api_client, make_user, make_beneficiary, monkeypatch, role
 ):
     monkeypatch.setattr(timezone, "now", lambda: datetime(2026, 11, 14, tzinfo=utc_timezone.utc))
-    first = make_beneficiary()
+    user = make_user(role)
+    worker = user.worker_profile if role == Role.WORKER else None
+    first = make_beneficiary(worker=worker)
     second = make_beneficiary()
     november_start = datetime(2026, 11, 1, 3, tzinfo=utc_timezone.utc)
     for index, (beneficiary, purpose, status, paid_at, amount) in enumerate([
@@ -239,14 +241,17 @@ def test_monthly_revenue_totals_paid_contributions_by_local_payment_date(
             txid=f"monthly-revenue-{index}",
         )
 
-    api_client.force_authenticate(make_user(role))
+    api_client.force_authenticate(user)
     response = api_client.get("/api/billing/payments/monthly-revenue/")
     assert response.status_code == 200
-    assert response.data == {"month": "2026-11", "total": "59.35"}
+    expected_total = "25.10" if role == Role.WORKER else "59.35"
+    assert response.data == {"month": "2026-11", "total": expected_total}
+    if role == Role.WORKER:
+        assert api_client.get("/api/billing/payments/").status_code == 403
 
 
-@pytest.mark.parametrize("role", [Role.BENEFICIARY, Role.WORKER, Role.PROVIDER])
-def test_monthly_revenue_restricted_to_admin_and_bishop(api_client, make_user, role):
+@pytest.mark.parametrize("role", [Role.BENEFICIARY, Role.PROVIDER])
+def test_monthly_revenue_denies_beneficiary_and_provider(api_client, make_user, role):
     api_client.force_authenticate(make_user(role))
     assert api_client.get("/api/billing/payments/monthly-revenue/").status_code == 403
 

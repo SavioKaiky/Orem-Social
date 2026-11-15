@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Role
-from accounts.permissions import IsAdminOrBishopReadOnly
+from members.permissions import CanViewReports
 
 from .models import CARENCE_MONTHS, Notification, Payment, PaymentPurpose, PaymentStatus, PricingConfig
 from .permissions import CanReadPayments, IsBeneficiary
@@ -111,9 +111,11 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             return queryset.none()
         if self.request.user.role == Role.BENEFICIARY:
             queryset = queryset.filter(beneficiary__user=self.request.user)
+        elif self.request.user.role == Role.WORKER:
+            queryset = queryset.filter(beneficiary__worker__user=self.request.user)
         return queryset
 
-    @action(detail=False, methods=["get"], url_path="monthly-revenue", permission_classes=[IsAdminOrBishopReadOnly])
+    @action(detail=False, methods=["get"], url_path="monthly-revenue", permission_classes=[CanViewReports])
     def monthly_revenue(self, request):
         """Total de contribuições recebidas no mês civil corrente."""
         month_start = timezone.localdate().replace(day=1)
