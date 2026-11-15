@@ -62,6 +62,14 @@ export function BishopDashboard({ userId }: { userId: number }) {
     { active: 0, inactive: 0, pending: 0 },
   );
 
+  const assessedHolders = counts ? counts.active + counts.inactive : 0;
+  const complianceRate = counts && assessedHolders > 0
+    ? (counts.active / assessedHolders).toLocaleString('pt-BR', {
+        style: 'percent',
+        maximumFractionDigits: 2,
+      })
+    : null;
+
   return (
     <>
       <Card>
@@ -74,6 +82,8 @@ export function BishopDashboard({ userId }: { userId: number }) {
             <Body>Adimplentes: {counts.active}</Body>
             <Body>Inadimplentes: {counts.inactive}</Body>
             <Body>Aguardando primeiro pagamento: {counts.pending}</Body>
+            <Body>Taxa de adimplência: {complianceRate ?? 'sem base para cálculo'}</Body>
+            <Body muted>Base do cálculo: titulares adimplentes e inadimplentes.</Body>
           </>
         ) : (
           <Body muted>Carregando os totais...</Body>
