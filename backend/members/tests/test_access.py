@@ -1,9 +1,11 @@
+from datetime import date
+
 import pytest
 from django.utils import timezone
 
 from accounts.models import Role
 from billing.models import Payment, PaymentPurpose, PaymentStatus
-from members.models import BeneficiaryStatus, State
+from members.models import BeneficiaryStatus, Dependent, Relationship, State
 
 
 def test_anonymous_has_no_access(api_client):
@@ -108,12 +110,38 @@ def test_summary_groups_by_state(api_client, make_user, make_beneficiary):
     assert data["groups"][1]["by_status"] == {"pending": 1, "active": 1}
 
 
+def test_bishop_summary_calculates_prebenda(api_client, make_user, make_beneficiary):
+    active = make_beneficiary(status=BeneficiaryStatus.ACTIVE)
+    inactive = make_beneficiary(status=BeneficiaryStatus.INACTIVE)
+    pending = make_beneficiary()
+    make_beneficiary(status=BeneficiaryStatus.ACTIVE)
+    for holder, is_active in [(active, True)] * 3 + [(active, False), (inactive, True), (pending, True)]:
+        Dependent.objects.create(
+            beneficiary=holder,
+            full_name="Dependente de teste",
+            birth_date=date(2015, 1, 1),
+            relationship=Relationship.CHILD,
+            is_active=is_active,
+        )
+
+    api_client.force_authenticate(make_user(Role.BISHOP))
+    response = api_client.get("/api/beneficiaries/summary/")
+    assert response.status_code == 200
+    assert response.data["prebenda"] == {
+        "active_holders": 2,
+        "active_dependents": 3,
+        "total_reais": 7,
+    }
+
+
 def test_summary_is_scoped_for_worker(api_client, make_user, make_beneficiary):
     worker = make_user(Role.WORKER)
     make_beneficiary(worker=worker.worker_profile)
     make_beneficiary()
     api_client.force_authenticate(worker)
-    assert api_client.get("/api/beneficiaries/summary/").data["total"] == 1
+    response = api_client.get("/api/beneficiaries/summary/")
+    assert response.data["total"] == 1
+    assert "prebenda" not in response.data
 
 
 def test_worker_retention_counts_each_confirmed_contributor_once(api_client, make_user, make_beneficiary):

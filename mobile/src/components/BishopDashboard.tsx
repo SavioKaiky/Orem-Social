@@ -7,6 +7,11 @@ import { Banner, Body, Button, Card } from './ui';
 
 type BeneficiarySummary = {
   total: number;
+  prebenda?: {
+    active_holders: number;
+    active_dependents: number;
+    total_reais: number;
+  };
   groups: {
     state: string;
     total: number;
@@ -53,6 +58,7 @@ export function BishopDashboard({ userId }: { userId: number }) {
     queryFn: () => api<WorkerRankingEntry[]>('/workers/ranking/'),
   });
   const reportQuery = month ? report : summary;
+  const prebenda = summary.data?.prebenda;
   const counts = summary.data?.groups.reduce(
     (totals, { by_status }) => ({
       active: totals.active + (by_status.active ?? 0),
@@ -122,6 +128,14 @@ export function BishopDashboard({ userId }: { userId: number }) {
           <Body muted>Carregando a receita...</Body>
         )}
       </Card>
+      {prebenda && !summary.isError ? (
+        <Card>
+          <Body>Prebenda estimada</Body>
+          <Body>{formatMoney(prebenda.total_reais)}</Body>
+          <Body muted>Titulares adimplentes: {prebenda.active_holders} × R$ 2,00</Body>
+          <Body muted>Dependentes ativos desses titulares: {prebenda.active_dependents} × R$ 1,00</Body>
+        </Card>
+      ) : null}
       <Card>
         <Body>Beneficiários por UF</Body>
         <Body muted>

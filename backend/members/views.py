@@ -155,6 +155,15 @@ class BeneficiaryViewSet(
                 else None
             )
             result["retention"] = retention
+        if request.user.role == Role.BISHOP:
+            active_holders = sum(group["by_status"].get(BeneficiaryStatus.ACTIVE, 0) for group in data)
+            eligible_holders = queryset.filter(status=BeneficiaryStatus.ACTIVE)
+            active_dependents = Dependent.objects.filter(beneficiary__in=eligible_holders, is_active=True).count()
+            result["prebenda"] = {
+                "active_holders": active_holders,
+                "active_dependents": active_dependents,
+                "total_reais": active_holders * 2 + active_dependents,
+            }
         return Response(result)
 
 
